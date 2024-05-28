@@ -11,6 +11,7 @@ contact me in case of bug at benoit.guibert@inserm.fr
 import sys
 import os
 import argparse
+import textwrap
 try:
     import pyfaidx
 except ModuleNotFoundError as err:
@@ -31,7 +32,7 @@ def main():
         sys.exit(f"\n{COL.RED}WriteError: directory {os.path.dirname(args.genome)!r} may not be "
                   "writable.\nIf you can't change the rights, you can create a symlink and target "
                   f"it. For example:\n  ln -s {args.genome} $HOME\n{COL.END}")
-    bed_ctrl(args, chr_dict)
+
     res = compute(args, chr_dict)
     # ~ print(*res, sep='\n---\n')
     write(args, res)
@@ -42,12 +43,26 @@ def ctrl_args(args):
         sys.exit(f"{COL.RED}option '--remove' needs '--append' option.")
 
 
-def bed_ctrl(args, chr_dict):
-    with open(args.bed.name) as fh:
+def _tab_length(args):
+    """ Function doc """
+    tab_len = 0
+    with open(args.input.name) as fh:
         for row in fh:
+            if not row.startswith('#'):
+                tab_len = len(row.split('\t'))
+                break
+    return tab_len
+
+
+def _bed_ctrl(args, chr_dict):
+    with open(args.input.name) as fh:
+        for i,row in enumerate(fh):
             if row.startswith('#'):
                 continue
-            chr, start, end, name, score, strand, *rest = row.rstrip('\n').split('\t')
+            try:
+                chr, start, end, *rest = row.rstrip('\n').split('\t')
+            except ValueError:
+                sys.exit(f"{COL.RED}ColumnError: not enough columns at line {i+1} (check your bed file)")
 
             ### Check some commonly issues
             if chr not in chr_dict:
@@ -63,22 +78,38 @@ def compute(args, chr_dict):
 
     res = []
 
-    for row in args.bed:
-        chr, start, end, name, score, strand, *ext = row.rstrip().split('\t')
-        start = int(start) - args.append
+    ### How many columns in the BED file
+    tab_len = _tab_length(args)
+
+    ### Control BED file syntax
+    _bed_ctrl(args, chr_dict)
+
+
+    for i,row in enumerate(args.input):
+        if tab_len >= 6:
+            chr, start, end, name, score, strand, *ext = row.rstrip().split('\t')
+        elif tab_len >= 4:
+            chr, start, end, name, *ext = row.rstrip().split('\t')
+        else:
+            chr, start, end, *ext = row.rstrip().split('\t')
+
+        if tab_len < 4:
+            name = f"sequence_{i+1}"
+
+        start = int(start) - args.append - 1
         end = int(end) +  args.append
 
         seq = chr_dict[chr][start:end]
 
         ### Handle strand
-        seq = seq.complement.reverse.seq if strand == '-' and not args.nostrand else seq.seq
+        seq = seq.complement.reverse.seq if tab_len >=6 and strand == '-' and not args.nostrand else seq.seq
 
         ### Handle remove
         if args.remove:
             seq = seq[:args.append] + seq[-args.append:]
 
         ### push in results
-        res.append(f">{name}\n{seq}\n")
+        res.append(f">{name}\n{textwrap.fill(seq, width=100)}\n")
 
     return res
 
@@ -87,7 +118,7 @@ def write(args, res):
     """ Function doc """
     ### define output file
     if not args.output:
-        name, ext = os.path.splitext(os.path.basename(args.bed.name))
+        name, ext = os.path.splitext(os.path.basename(args.input.name))
         args.output = f"{name}-bed2seq.fa"
     ### write results in file
     with open(args.output, 'w') as fh:
@@ -115,7 +146,7 @@ def usage():
     doc_sep = '=' * min(80, os.get_terminal_size(2)[0])
     parser = argparse.ArgumentParser(description= f'{doc_sep}{__doc__}{doc_sep}',
                                      formatter_class=argparse.RawDescriptionHelpFormatter,)
-    parser.add_argument("bed",
+    parser.add_argument("input",
                         help="bed file",
                         type=argparse.FileType('r'),
                        )

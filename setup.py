@@ -23,7 +23,7 @@ setuptools.setup(
     ],
     entry_points = {
         'console_scripts': [
-            'bed2seq = bed2ses.bed2seq:main',
+            'bed2seq = bed2seq.bed2seq:main',
         ],
     },
     include_package_data = True,
