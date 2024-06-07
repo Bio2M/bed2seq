@@ -33,9 +33,9 @@ def main():
                   "writable.\nIf you can't change the rights, you can create a symlink and target "
                   f"it. For example:\n  ln -s {args.genome} $HOME\n{COL.END}")
 
-    res = compute(args, chr_dict)
+    resp = compute(args, chr_dict)
     # ~ print(*res, sep='\n---\n')
-    write(args, res)
+    write(args, resp)
 
 
 def ctrl_args(args):
@@ -43,49 +43,64 @@ def ctrl_args(args):
         sys.exit(f"{COL.RED}option '--remove' needs '--append' option.")
 
 
-def _tab_length(args):
+def _tab_length(rows):
     """ Function doc """
     tab_len = 0
-    with open(args.input.name) as fh:
-        for row in fh:
-            if not row.startswith('#'):
-                tab_len = len(row.split('\t'))
-                break
+    for row in rows:
+        if not row.startswith('#'):
+            tab_len = len(row.split('\t'))
+            break
     return tab_len
 
 
-def _bed_ctrl(args, chr_dict):
-    with open(args.input.name) as fh:
-        for i,row in enumerate(fh):
-            if row.startswith('#'):
-                continue
-            try:
-                chr, start, end, *rest = row.rstrip('\n').split('\t')
-            except ValueError:
-                sys.exit(f"{COL.RED}ColumnError: not enough columns at line {i+1} (check your bed file)")
+def _input_ok(args, rows, resp, chr_dict):
+    for i,row in enumerate(rows):
+        if row.startswith('#'):
+            continue
+        try:
+            chr, start, end, *rest = row.rstrip('\n').split('\t')
+        except ValueError:
+            resp["error"] = f"Not enough columns at line {i+1} (check your bed file)"
+            resp["is_ok"] = False
+            return False
 
-            ### Check some commonly issues
-            if chr not in chr_dict:
-                sys.exit(f"{COL.RED}ErrorChr: Chromosomes are not named in the same way in the "
-                          "query and the genome file. Below the first chromosome found: \n"
-                         f" your query: {chr}\n"
-                         f" genome: {next(iter(chr_dict.keys()))}\n"
-                         f"Please, correct your request (or modify the file '{args.genome}.fai').")
-            break
+        ### Check some commonly issues
+        if chr not in chr_dict:
+            resp["error"] = ("ErrorChr: Chromosomes are not named in the same way in the "
+                      "query and the genome file. Below the first chromosome found: \n"
+                     f" your query: {chr}\n"
+                     f" genome: {next(iter(chr_dict.keys()))}\n"
+                     f"Please, correct your request (or modify the file '{args.genome}.fai').")
+            resp["is_ok"] = False
+            return False
+        break
+    return True
 
 
 def compute(args, chr_dict):
 
-    res = []
+    resp = {
+        "is_ok": True,
+        "result": [],
+        "warning": [],
+        "error": None
+        }
+    
+    ### convert input as list
+    if isinstance(args.input, str):
+        rows = args.input.splitlines()
+    else:
+        rows = args.input.read().splitlines()
 
     ### How many columns in the BED file
-    tab_len = _tab_length(args)
+    tab_len = _tab_length(rows)
 
-    ### Control BED file syntax
-    _bed_ctrl(args, chr_dict)
+    ### check input syntax
+    if not _input_ok(args, rows, resp, chr_dict):
+        return resp
 
 
-    for i,row in enumerate(args.input):
+    for i,row in enumerate(rows):
         if tab_len >= 6:
             chr, start, end, name, score, strand, *ext = row.rstrip().split('\t')
         elif tab_len >= 4:
@@ -109,24 +124,33 @@ def compute(args, chr_dict):
             seq = seq[:args.append] + seq[-args.append:]
 
         ### push in results
-        res.append(f">{name}\n{textwrap.fill(seq, width=100)}\n")
+        resp["result"].append(f">{name}\n{textwrap.fill(seq, width=100)}")
 
-    return res
+    return resp
 
 
-def write(args, res):
-    """ Function doc """
+def write(args, resp):
+    
     ### define output file
     if not args.output:
         name, ext = os.path.splitext(os.path.basename(args.input.name))
         args.output = f"{name}-bed2seq.fa"
-    ### write results in file
-    with open(args.output, 'w') as fh:
-        if not res:
-            return
-        for row in res:
-            fh.write(row)
 
+    if resp["is_ok"]:
+        ## write results in file
+        if resp["result"]:
+            with open(args.output, 'w') as fh:
+                for result in resp["result"]:
+                    fh.write(f"{result}\n")
+        ### WARNINGS
+        if resp["warning"]:
+            print(f"{COL.PURPLE}Warnings:\n")
+            for warning in resp["warning"]:
+                for warning in resp["warning"]:
+                    print(f"{warning}\n")
+            print(COL.END)
+    else:
+        print(f"{COL.RED}{resp['error']}")
 
 
 class COL:
