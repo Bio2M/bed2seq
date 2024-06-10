@@ -61,20 +61,20 @@ def _input_ok(args, rows, resp, chr_dict):
         try:
             chr, start, end, *rest = row.rstrip('\n').split('\t')
         except ValueError:
-            resp["error"] = f"Not enough columns at line {i+1} (check your bed file)"
+            resp["error"] = f"not enough columns at line {i+1} (check your bed file)."
             resp["is_ok"] = False
             return False
             
-        if len(rest) < 6:
-            resp["warning"].append("Strand column missing: stranded not supported.")
+        if len(rest) < 6 and not args.nostrand:
+            resp["warning"].append("strand column missing: strands cannot be evaluated.")
 
         ### Check some commonly issues
         if chr not in chr_dict:
-            resp["error"] = ("ErrorChr: Chromosomes are not named in the same way in the "
+            resp["error"] = ("chromosomes are not named in the same way in the "
                       "query and the genome file. Below the first chromosome found: \n"
-                     f" your query: {chr}\n"
-                     f" genome: {next(iter(chr_dict.keys()))}\n"
-                     f"Please, correct your request (or modify the file '{args.genome}.fai').")
+                     f"     your query: {chr}\n"
+                     f"     genome: {next(iter(chr_dict.keys()))}\n"
+                     f"   Please, correct your request (or modify the file '{args.genome}.fai').")
             resp["is_ok"] = False
             return False
         break
@@ -146,16 +146,16 @@ def write(args, resp):
             with open(args.output, 'w') as fh:
                 for result in resp["result"]:
                     fh.write(f"{result}\n")
-            print(f"{args.output} succefully created.")
+            print(f"\n🧬 {args.output} succefully created.")
         ### WARNINGS
         if resp["warning"]:
-            print(f"{COL.PURPLE}\nWarnings:\n")
+            print(f"{COL.PURPLE}\n⚠️  Warnings:")
             for warning in resp["warning"]:
                 for warning in resp["warning"]:
-                    print(f"{warning}\n")
+                    print(f"   - {warning}")
             print(COL.END)
     else:
-        print(f"{COL.RED}{resp['error']}")
+        print(f"\n☠️  {COL.RED}Error: {resp['error']}\n")
 
 
 class COL:
@@ -193,7 +193,7 @@ def usage():
                         action="store_true",
                         help="only with '--append' option, keep only appended part",
                         )
-    parser.add_argument('-n', '--nostrand',
+    parser.add_argument('-n', '--nostrand', '--nostranded',
                         action="store_true",
                         help="don't reverse complement when strand is '-'",
                         )
