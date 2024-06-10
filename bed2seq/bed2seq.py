@@ -54,6 +54,7 @@ def _tab_length(rows):
 
 
 def _input_ok(args, rows, resp, chr_dict):
+    ### find first no commented line and check it 
     for i,row in enumerate(rows):
         if row.startswith('#'):
             continue
@@ -63,6 +64,9 @@ def _input_ok(args, rows, resp, chr_dict):
             resp["error"] = f"Not enough columns at line {i+1} (check your bed file)"
             resp["is_ok"] = False
             return False
+            
+        if len(rest) < 6:
+            resp["warning"].append("Strand column missing: stranded not supported.")
 
         ### Check some commonly issues
         if chr not in chr_dict:
@@ -142,9 +146,10 @@ def write(args, resp):
             with open(args.output, 'w') as fh:
                 for result in resp["result"]:
                     fh.write(f"{result}\n")
+            print(f"{args.output} succefully created.")
         ### WARNINGS
         if resp["warning"]:
-            print(f"{COL.PURPLE}Warnings:\n")
+            print(f"{COL.PURPLE}\nWarnings:\n")
             for warning in resp["warning"]:
                 for warning in resp["warning"]:
                     print(f"{warning}\n")
