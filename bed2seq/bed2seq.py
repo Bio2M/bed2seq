@@ -65,7 +65,7 @@ def _input_ok(args, rows, resp, chr_dict):
             resp["is_ok"] = False
             return False
             
-        if len(rest) < 6 and not args.nostrand:
+        if len(rest) < 3 and not args.nostrand:
             resp["warning"].append("strand column missing: strands cannot be evaluated.")
 
         ### Check some commonly issues
@@ -146,10 +146,10 @@ def write(args, resp):
             with open(args.output, 'w') as fh:
                 for result in resp["result"]:
                     fh.write(f"{result}\n")
-            print(f"\n🧬 {args.output} succefully created.")
+            print(f"\n🧬 {args.output} succefully created.\n")
         ### WARNINGS
         if resp["warning"]:
-            print(f"{COL.PURPLE}\n⚠️  Warnings:")
+            print(f"{COL.PURPLE}⚠️  Warnings:")
             for warning in resp["warning"]:
                 for warning in resp["warning"]:
                     print(f"   - {warning}")

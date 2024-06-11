@@ -3,10 +3,25 @@
 
 From a BED file, return the sequences according to the genome supplied
 
-WARNING
-This is an alpha version, it could contain issues.
+## Installation 
 
+### Solution 1 (Preferred)
 
+Install with pip
+
+```
+pip install bed2seq
+```
+
+### Solution 2
+
+Installation from github:
+
+```
+git clone https://github.com/Bio2M/bed2seq.git
+```
+
+The `pyfaidx` python package is required, install it with `pip`, `apt` or  your preferred method.
 
 ## usage
 
@@ -23,6 +38,6 @@ options:
   -r, --remove          only with '--append' option, keep only appended part
   -n, --nostrand        don't reverse complement when strand is '-'
   -o OUTPUT, --output OUTPUT
-                        Output file (default: <input_file>-bed2seq.tsv)
+                        Output file (default: <input_file>-bed2seq.fa)
   -v, --version         show program's version number and exit
 ```
