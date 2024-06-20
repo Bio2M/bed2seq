@@ -54,7 +54,7 @@ def _tab_length(rows):
 
 
 def _input_ok(args, rows, resp, chr_dict):
-    ### find first no commented line and check it 
+    ### find first no commented line and check it
     for i,row in enumerate(rows):
         if row.startswith('#'):
             continue
@@ -64,21 +64,33 @@ def _input_ok(args, rows, resp, chr_dict):
             resp["error"] = f"not enough columns at line {i+1} (check your bed file)."
             resp["is_ok"] = False
             return False
-            
+
         if len(rest) < 3 and not args.nostrand:
             resp["warning"].append("strand column missing: strands cannot be evaluated.")
 
+        ### Try to accoding chr column
+        if chr not in chr_dict:
+            ### chromosome begin by 'chr' in user file, not in genome --> need to remove chr
+            if chr.lstrip('chr') in chr_dict:
+                args.chr = '-chr'
+            ### genome begin by 'chr', but not in user file --> need to add chr
+            if f"chr{chr}" in chr_dict:
+                args.chr = '+chr'
+
+        '''
         ### Check some commonly issues
         if chr not in chr_dict:
             resp["error"] = ("chromosomes are not named in the same way in the "
                       "query and the genome file. Below the first chromosome found: \n"
                      f"     your query: {chr}\n"
                      f"     genome: {next(iter(chr_dict.keys()))}\n"
-                     f"   Please, correct your request (or modify the file '{args.genome}.fai').")
+                     f"   Please, correct your request.")
             resp["is_ok"] = False
             return False
+        '''
         break
     return True
+
 
 
 def compute(args, chr_dict):
@@ -89,8 +101,8 @@ def compute(args, chr_dict):
         "warning": [],
         "error": None
         }
-    
-    ### convert input as list
+
+    ### convert input as row list
     if isinstance(args.input, str):
         rows = args.input.splitlines()
     else:
@@ -103,7 +115,6 @@ def compute(args, chr_dict):
     if not _input_ok(args, rows, resp, chr_dict):
         return resp
 
-
     for i,row in enumerate(rows):
         if tab_len >= 6:
             chr, start, end, name, score, strand, *ext = row.rstrip().split('\t')
@@ -115,9 +126,17 @@ def compute(args, chr_dict):
         if tab_len < 4:
             name = f"sequence_{i+1}"
 
-        start = int(start) - args.append - 1
+        start = int(start) - args.append
         end = int(end) +  args.append
 
+        ### handle chromosome
+        if 'chr' in args:
+            if args.chr == '-chr':
+                chr = chr.lstrip('chr')
+            else:
+                chr = f"chr{chr}"
+
+        ### get sequence
         seq = chr_dict[chr][start:end]
 
         ### Handle strand
@@ -134,7 +153,7 @@ def compute(args, chr_dict):
 
 
 def write(args, resp):
-    
+
     ### define output file
     if not args.output:
         name, ext = os.path.splitext(os.path.basename(args.input.name))
