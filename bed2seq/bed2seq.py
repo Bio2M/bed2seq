@@ -12,6 +12,7 @@ import sys
 import os
 import argparse
 import textwrap
+import ascii
 try:
     import pyfaidx
 except ModuleNotFoundError as err:
@@ -53,19 +54,21 @@ def _tab_length(rows):
     return tab_len
 
 
-def _input_ok(args, rows, resp, chr_dict):
+def _input_ok(args, rows, resp, chr_dict, cols_id):
     ### find first no commented line and check it
     for i,row in enumerate(rows):
         if row.startswith('#'):
             continue
+        fields = row.rstrip('\n').split('\t')
+        nfields = len(fields)
         try:
-            chr, start, end, *rest = row.rstrip('\n').split('\t')
+            chr, start, end = fields[:3]
         except ValueError:
             resp["error"] = f"not enough columns at line {i+1} (check your bed file)."
             resp["is_ok"] = False
             return False
 
-        if len(rest) < 3 and not args.nostrand:
+        if nfields < 6 and not args.nostrand:
             resp["warning"].append("strand column missing: strands cannot be evaluated.")
 
         ### Try to accoding chr column
@@ -76,6 +79,14 @@ def _input_ok(args, rows, resp, chr_dict):
             ### genome begin by 'chr', but not in user file --> need to add chr
             if f"chr{chr}" in chr_dict:
                 args.chr = '+chr'
+
+        ### check if --add-columns is compatible with number of columns
+        print(args.add_columns, ' --- ', max(cols_id), nfields)
+        if args.add_columns and max(cols_id) > nfields:
+            resp["error"] = (f"BED file has {nfields} columns, but you asked for "
+                  f"{max(args.add_columns)}.")
+            resp["is_ok"] = False
+            return False
 
         '''
         ### Check some commonly issues
@@ -100,7 +111,7 @@ def compute(args, chr_dict):
         "result": [],
         "warning": [],
         "error": None
-        }
+    }
 
     ### convert input as row list
     if isinstance(args.input, str):
@@ -111,26 +122,31 @@ def compute(args, chr_dict):
     ### How many columns in the BED file
     tab_len = _tab_length(rows)
 
+    ### columns characters are converted as index, ex: AA -> 27
+    cols_id = ascii.get_index(args.add_columns)
+
     ### check input syntax
-    if not _input_ok(args, rows, resp, chr_dict):
+    if not _input_ok(args, rows, resp, chr_dict, cols_id):
         return resp
 
     for i,row in enumerate(rows):
+        fields = row.rstrip('\n').split('\t')
+        # ~ nfields = len(fields)
         if tab_len >= 6:
-            chr, start, end, name, score, strand, *ext = row.rstrip().split('\t')
+            chr, start, end, id_seq, score, strand = fields[:6]
         elif tab_len >= 4:
-            chr, start, end, name, *ext = row.rstrip().split('\t')
+            chr, start, end, id_seq = fields[:4]
         else:
-            chr, start, end, *ext = row.rstrip().split('\t')
+            chr, start, end = fields[:3]
 
         if tab_len < 4:
-            name = f"sequence_{i+1}"
+            id_seq = f"sequence_{i+1}"
 
-        start = int(start) - args.append
-        end = int(end) +  args.append
+        start = int(start) - args.extend
+        end = int(end) +  args.extend
 
         ### handle chromosome
-        if 'chr' in args:
+        if hasattr(args, 'chr'):
             if args.chr == '-chr':
                 chr = chr.lstrip('chr')
             else:
@@ -146,8 +162,13 @@ def compute(args, chr_dict):
         if args.remove:
             seq = seq[:args.append] + seq[-args.append:]
 
+        ### append additional selected columns to the header
+        if cols_id:
+            added_cols = f"{' '}{' '.join([fields[num-1] for num in cols_id])}"
+            id_seq += added_cols
+
         ### push in results
-        resp["result"].append(f">{name}\n{textwrap.fill(seq, width=100)}")
+        resp["result"].append(f">{id_seq}\n{textwrap.fill(seq, width=100)}")
 
     return resp
 
@@ -170,8 +191,7 @@ def write(args, resp):
         if resp["warning"]:
             print(f"{COL.PURPLE}⚠️  Warnings:")
             for warning in resp["warning"]:
-                for warning in resp["warning"]:
-                    print(f"   - {warning}")
+                print(f"   - {warning}")
             print(COL.END)
     else:
         print(f"\n☠️  {COL.RED}Error: {resp['error']}\n")
@@ -203,18 +223,23 @@ def usage():
                         metavar="genome",
                         required=True,
                        )
-    parser.add_argument('-a', '--append',
+    parser.add_argument('-e', '--extend',
                         type=int,
-                        help="enlarge the sequence ('-a 20' append 20 bp on each side)",
+                        help="extend the sequence ('-a 20' append 20 bp on each side)",
                         default=0,
                        )
     parser.add_argument('-r', '--remove',
                         action="store_true",
-                        help="only with '--append' option, keep only appended part",
+                        help="only with '-e/--extend' option, keep only axtended part",
                         )
     parser.add_argument('-n', '--nostrand', '--nostranded',
                         action="store_true",
                         help="don't reverse complement when strand is '-'",
+                        )
+    parser.add_argument("-a", "--add-columns",
+                        help="Add one or more columns to header (ex: '-a 3 AA' will add columns "
+                             "3 and 27). The first column is '1' (or 'A')",
+                        nargs= '+',
                         )
     parser.add_argument("-o", "--output",
                         type=str,
