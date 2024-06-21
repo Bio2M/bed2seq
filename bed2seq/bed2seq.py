@@ -81,10 +81,9 @@ def _input_ok(args, rows, resp, chr_dict, cols_id):
                 args.chr = '+chr'
 
         ### check if --add-columns is compatible with number of columns
-        print(args.add_columns, ' --- ', max(cols_id), nfields)
         if args.add_columns and max(cols_id) > nfields:
             resp["error"] = (f"BED file has {nfields} columns, but you asked for "
-                  f"{max(args.add_columns)}.")
+                  f"{max(cols_id)}.")
             resp["is_ok"] = False
             return False
 
