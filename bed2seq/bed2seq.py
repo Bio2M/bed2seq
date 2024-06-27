@@ -40,7 +40,7 @@ def main():
 
 
 def ctrl_args(args):
-    if args.remove and not args.append:
+    if args.remove and not args.extend:
         sys.exit(f"{COL.RED}option '--remove' needs '--append' option.")
 
 
@@ -159,7 +159,7 @@ def compute(args, chr_dict):
 
         ### Handle remove
         if args.remove:
-            seq = seq[:args.append] + seq[-args.append:]
+            seq = seq[:args.extend] + seq[-args.extend:]
 
         ### append additional selected columns to the header
         if cols_id:
