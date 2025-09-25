@@ -163,7 +163,7 @@ def compute(args, chr_dict):
 
         ### append additional selected columns to the header
         if cols_id:
-            added_cols = f"{' '}{' '.join([fields[num-1] for num in cols_id])}"
+            added_cols = f"{args.delimiter}{args.delimiter.join([fields[num-1] for num in cols_id])}"
             id_seq += added_cols
 
         ### push in results
@@ -239,6 +239,10 @@ def usage():
                         help="Add one or more columns to header (ex: '-a 3 AA' will add columns "
                              "3 and 27). The first column is '1' (or 'A')",
                         nargs= '+',
+                        )
+    parser.add_argument("-d", "--delimiter",
+                        help="with -a/--add-columns and a fasta format output, specifies a delimiter (default: space)",
+                        default= ' ',
                         )
     parser.add_argument("-o", "--output",
                         type=str,
