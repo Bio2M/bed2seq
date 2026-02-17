@@ -35,7 +35,6 @@ def main():
                   f"it. For example:\n  ln -s {args.genome} $HOME\n{COL.END}")
 
     resp = compute(args, chr_dict)
-    # ~ print(*res, sep='\n---\n')
     write(args, resp)
 
 
@@ -54,24 +53,26 @@ def _tab_length(rows):
     return tab_len
 
 
-def _input_ok(args, rows, resp, chr_dict, cols_id):
+def _input_ok(args, rows, resp, chr_dict, cols_id, header_keys):
     ### find first no commented line and check it
     for i,row in enumerate(rows):
-        if row.startswith('#'):
+        if any(map(row.lstrip().startswith, header_keys)):
             continue
         fields = row.rstrip('\n').split('\t')
         nfields = len(fields)
         try:
             chr, start, end = fields[:3]
+            int(start)
+            int(end)
         except ValueError:
-            resp["error"] = f"not enough columns at line {i+1} (check your bed file)."
+            resp["error"] = f"line {i+1} incorrectly formatted (check your bed file)."
             resp["is_ok"] = False
             return False
 
         if nfields < 6 and not args.nostrand:
             resp["warning"].append("strand column missing: strands cannot be evaluated.")
 
-        ### Try to accoding chr column
+        ### Try to according chr column
         if chr not in chr_dict:
             ### chromosome begin by 'chr' in user file, not in genome --> need to remove chr
             if chr.lstrip('chr') in chr_dict:
@@ -112,62 +113,77 @@ def compute(args, chr_dict):
         "error": None
     }
 
-    ### convert input as row list
-    if isinstance(args.input, str):
-        rows = args.input.splitlines()
-    else:
-        rows = args.input.read().splitlines()
-
-    ### How many columns in the BED file
-    tab_len = _tab_length(rows)
-
-    ### columns characters are converted as index, ex: AA -> 27
-    cols_id = ascii.get_index(args.add_columns)
-
-    ### check input syntax
-    if not _input_ok(args, rows, resp, chr_dict, cols_id):
-        return resp
-
-    for i,row in enumerate(rows):
-        fields = row.rstrip('\n').split('\t')
-        # ~ nfields = len(fields)
-        if tab_len >= 6:
-            chr, start, end, id_seq, score, strand = fields[:6]
-        elif tab_len >= 4:
-            chr, start, end, id_seq = fields[:4]
+    try:
+        ### convert input as row list
+        if isinstance(args.input, str):
+            rows = args.input.splitlines()
         else:
-            chr, start, end = fields[:3]
-
-        if tab_len < 4:
-            id_seq = f"sequence_{i+1}"
-
-        start = int(start) - args.extend
-        end = int(end) +  args.extend
-
-        ### handle chromosome
-        if hasattr(args, 'chr'):
-            if args.chr == '-chr':
-                chr = chr.lstrip('chr')
-            else:
-                chr = f"chr{chr}"
-
-        ### get sequence
-        seq = chr_dict[chr][start:end]
-
-        ### Handle strand
-        seq = seq.complement.reverse.seq if tab_len >=6 and strand == '-' and not args.nostrand else seq.seq
-
-        ### Handle remove
-        if args.remove:
-            seq = seq[:args.extend] + seq[-args.extend:]
-
-        ### append additional selected columns to the header
-        if cols_id:
-            added_cols = f"{args.delimiter}{args.delimiter.join([fields[num-1] for num in cols_id])}"
-            id_seq += added_cols
-
-        ### push in results
-        resp["result"].append(f">{id_seq}\n{textwrap.fill(seq, width=100)}")
+            rows = args.input.read().splitlines()
+    
+        ### How many columns in the BED file
+        tab_len = _tab_length(rows)
+    
+        ### columns characters are converted as index, ex: AA -> 27
+        cols_id = ascii.get_index(args.add_columns)
+    
+        ### to detect headers
+        header_keys = ('#', 'browser', 'track name')
+        
+        ### check input syntax
+        if not _input_ok(args, rows, resp, chr_dict, cols_id, header_keys):
+            return resp
+        
+        for i,row in enumerate(rows):
+            if not any(map(row.lstrip().startswith, header_keys)):
+                try:
+                    fields = row.rstrip('\n').split('\t')
+                    # ~ nfields = len(fields)
+                    if tab_len >= 6:
+                        chr, start, end, id_seq, score, strand = fields[:6]
+                    elif tab_len >= 4:
+                        chr, start, end, id_seq = fields[:4]
+                    else:
+                        chr, start, end = fields[:3]
+            
+                    if tab_len < 4:
+                        id_seq = f"sequence_{i+1}"
+            
+                    start = int(start) - args.extend
+                    end = int(end) +  args.extend
+            
+                    ### handle chromosome
+                    if hasattr(args, 'chr'):
+                        if args.chr == '-chr':
+                            chr = chr.lstrip('chr')
+                        else:
+                            chr = f"chr{chr}"
+            
+                    ### get sequence
+                    seq = chr_dict[chr][start:end]
+            
+                    ### Handle strand
+                    seq = seq.complement.reverse.seq if tab_len >=6 and strand == '-' and not args.nostrand else seq.seq
+            
+                    ### Handle remove
+                    if args.remove:
+                        seq = seq[:args.extend] + seq[-args.extend:]
+            
+                    ### append additional selected columns to the header
+                    if cols_id:
+                        added_cols = f"{args.delimiter}{args.delimiter.join([fields[num-1] for num in cols_id])}"
+                        id_seq += added_cols
+            
+                    ### push in results
+                    resp["result"].append(f">{id_seq}\n{textwrap.fill(seq, width=100)}")
+                
+                except ValueError:
+                    msg = f"incorrectly formatted file: at line {i}"
+                    resp["error"] = msg
+                    return resp
+    
+    except Exception as err:
+        resp["is_ok"] = False
+        resp["error"] = err
 
     return resp
 
