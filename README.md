@@ -7,7 +7,7 @@ From a BED file, return the sequences according to the genome supplied
 
 ### Solution 1 (Preferred)
 
-Install with pip
+In a virtualenv, install with pip
 
 ```
 pip install bed2seq
@@ -31,13 +31,18 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  -g genome, --genome genome
-                        genome as fasta file
-  -a APPEND, --append APPEND
-                        enlarge the sequence ('-a 20' append 20 bp on each side)
-  -r, --remove          only with '--append' option, keep only appended part
-  -n, --nostrand        don't reverse complement when strand is '-'
-  -o OUTPUT, --output OUTPUT
-                        Output file (default: <input_file>-bed2seq.fa)
+  -g, --genome genome   genome as fasta file
+  -e, --extend EXTEND   extend the sequence ('-a 20' append 20 bp on each side)
+  -r, --remove          only with '-e/--extend' option, keep only axtended part
+  -n, --nostrand, --nostranded
+                        don't reverse complement when strand is '-'
+  -a, --add-columns ADD_COLUMNS [ADD_COLUMNS ...]
+                        Add one or more columns to header (ex: '-a 3 AA' will 
+                        add columns 3 and 27). The first column is '1' (or 'A')
+  -d, --delimiter DELIMITER
+                        with -a/--add-columns and a fasta format output, 
+                        specifies a delimiter (default: '|')
+  -o, --output OUTPUT   Output file (default: <input_file>-bed2seq.tsv)
   -v, --version         show program's version number and exit
+
 ```
