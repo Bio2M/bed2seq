@@ -1,3 +1,7 @@
+[![Author](https://img.shields.io/badge/Author-Chloe_Bessière-lightgreen)](mailto:chloe.bessiere@inserm.fr)
+[![Author](https://img.shields.io/badge/Author-Anthony_Boureux-lightgreen)](mailto:anthony.boureux@inserm.fr)
+
+
 # bed2seq
 
 
